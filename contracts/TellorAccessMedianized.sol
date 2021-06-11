@@ -105,8 +105,19 @@ contract TellorAccessMedianized {
     mapping(uint256 => uint256[]) public latestValues;
     mapping(uint256 => uint256[]) public latestTimestamps;
     mapping(uint256 => uint256) public oldestTimestampFromLatestBlock;
+    mapping(uint256 => uint256) public numberReportersFromLatestBlock;
     uint256 public timeLimit;
     uint256 public quorum;
+    
+    constructor() {}
+    
+    function addReporter(address _reporter) external {
+        
+    }
+    
+    function getCurrentValue(uint256 _requestId) external {
+        
+    }
     
     function submitValue(uint256 _requestId, uint256 _value) external {
         // require isReporter
@@ -118,15 +129,18 @@ contract TellorAccessMedianized {
         uint256 _oldestTimestamp;
         (_ifRetrieve, _median, _oldestTimestamp) = getNewMedian(_requestId);
         
+        // Check whether nReporters of latest blockMedian >= min(5, totalReporters)
+        // if TRUE, create new block
         if(_ifRetrieve) {
+            uint256 _index;
             if(_oldestTimestamp == oldestTimestampFromLatestBlock[_requestId]) {
-                
+                _index = timestamps[_requestId].length - 1;
             } else {
-                uint256 _index = timestamps[_requestId].length;
-                values[_requestId][_index] = _median;
-                timestamps[_requestId].push(block.timestamp);
+                _index = timestamps[_requestId].length;
                 oldestTimestampFromLatestBlock[_requestId] = _oldestTimestamp;
             }
+            values[_requestId][_index] = _median;
+            timestamps[_requestId][_index] = (block.timestamp);
         }
     }
     
