@@ -97,37 +97,56 @@ library Select {
 }
 
 contract TellorAccessMedianized {
+    
     /*Storage*/
     mapping(uint256 => mapping(uint256 => uint256)) public values; //requestId -> timestamp -> value
     mapping(uint256 => uint256[]) public timestamps; //timestamp to array of values
     address[] public reporters;
+    uint256[] public availableReporterIndices;
     mapping(address => uint256) public reporterIndices;
     mapping(uint256 => uint256[]) public latestValues;
     mapping(uint256 => uint256[]) public latestTimestamps;
     mapping(uint256 => uint256) public oldestTimestampFromLatestBlock;
     mapping(uint256 => uint256) public numberReportersFromLatestBlock;
+    uint256 public numberOfReporters;
     uint256 public timeLimit;
     uint256 public quorum;
     
-    constructor() {}
+    constructor(uint256 _quorum, uint256 _timeLimit) {}
     
     function addReporter(address _reporter) external {
-        
+        uint256 _newReporterIndex;
+        if(availableReporterIndices.length > 0) {
+            _newReporterIndex = availableReporterIndices[availableReporterIndices.length-1];
+            availableReporterIndices.pop();
+        } else {
+            _newReporterIndex = numberOfReporters + 1;
+        }
+        reporters[_newReporterIndex] = _reporter;
+        reporterIndices[_reporter] = _newReporterIndex;
+        numberOfReporters++;
     }
     
-    function getCurrentValue(uint256 _requestId) external {
+    function getCurrentValue(uint256 _requestId) external view returns (bool, uint256, uint256) {
+        uint256 _count = getNewValueCountbyRequestId(_requestId);
+        if(numberReportersFromLatestBlock[_requestId] < numberOfReporters || 
+            oldestTimestampFromLatestBlock[_requestId] > block.timestamp - timeLimit) {
+            _count--;
+        } 
         
+        uint256 _time =
+            getTimestampbyRequestIDandIndex(_requestId, _count - 1);
+        uint256 _value = retrieveData(_requestId, _time);
+        if (_value > 0) return (true, _value, _time);
+        return (false, 0, _time);
     }
     
     function submitValue(uint256 _requestId, uint256 _value) external {
         // require isReporter
         latestValues[_requestId][reporterIndices[msg.sender]] = _value;
         latestTimestamps[_requestId][reporterIndices[msg.sender]] = block.timestamp;
-        
-        bool _ifRetrieve;
-        uint256 _median;
-        uint256 _oldestTimestamp;
-        (_ifRetrieve, _median, _oldestTimestamp) = getNewMedian(_requestId);
+
+        (bool _ifRetrieve, uint256 _median, uint256 _oldestTimestamp) = getNewMedian(_requestId);
         
         // Check whether nReporters of latest blockMedian >= min(5, totalReporters)
         // if TRUE, create new block
@@ -144,21 +163,66 @@ contract TellorAccessMedianized {
         }
     }
     
+    /**
+     * @dev Counts the number of values that have been submited for the request
+     * @param _requestId the requestId to look up
+     * @return uint count of the number of values received for the requestId
+    */
+    function getNewValueCountbyRequestId(uint256 _requestId) public view returns(uint) {
+        return timestamps[_requestId].length;
+    }
+    
+    /**
+     * @dev Gets the timestamp for the value based on their index
+     * @param _requestId is the requestId to look up
+     * @param _index is the value index to look up
+     * @return uint timestamp
+    */
+    function getTimestampbyRequestIDandIndex(uint256 _requestId, uint256 _index) public view returns(uint256) {
+        uint len = timestamps[_requestId].length;
+        if(len == 0 || len <= _index) return 0; 
+        return timestamps[_requestId][_index];
+    }
+    
+    /** 
+     * @dev Remove an account from the reporter role. Restricted to admins.
+     * @param _reporter_address is the address of the reporter to remove permissions to submit data
+    */
+    function removeReporter(address _reporter_address) external {
+        uint256 _reporterIndex = reporterIndices[_reporter_address];
+        reporters[_reporterIndex] = address(0);
+        reporterIndices[_reporter_address] = 0;
+        availableReporterIndices.push(_reporterIndex);
+        numberOfReporters--;
+    }
+    
+    /**
+     * @dev Retrieve value from oracle based on requestId/timestamp
+     * @param _requestId being requested
+     * @param _timestamp to retrieve data/value from
+     * @return uint value for requestId/timestamp submitted
+    */
+    function retrieveData(uint256 _requestId, uint256 _timestamp) public view returns(uint256){
+        return values[_requestId][_timestamp];
+    }
+    
     function getNewMedian(uint256 _requestId) public view returns(bool, uint256, uint256) {
-        uint256[] memory _validReports;
+        uint256[] memory _validReports = new uint256[](numberOfReporters);
+        uint256 _numberOfValidReports;
         uint256 _oldestTimestamp = block.timestamp;
         
-        for(uint256 i=0; i<latestValues[_requestId].length; i++) {
+        for(uint256 i=1; i<=latestValues[_requestId].length; i++) {
             if(latestTimestamps[_requestId][i] > block.timestamp - timeLimit) {
-                _validReports[_validReports.length] = latestValues[_requestId][i];
+                _validReports[_numberOfValidReports] = latestValues[_requestId][i];
+                _numberOfValidReports++;
                 if(latestTimestamps[_requestId][i] < _oldestTimestamp) {
                     _oldestTimestamp = latestTimestamps[_requestId][i];
                 }
             }
         }
         
-        if(_validReports.length >= quorum) {
-            return(true, Select.computeMedian(_validReports, _validReports.length), _oldestTimestamp);
+        if(_numberOfValidReports >= quorum) {
+            return(true, Select.computeMedian(_validReports, _numberOfValidReports), _oldestTimestamp);
         } else {
             return(false, 0, 0);
         }
