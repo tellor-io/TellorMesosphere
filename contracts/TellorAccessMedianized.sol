@@ -101,18 +101,22 @@ contract TellorAccessMedianized {
     /*Storage*/
     mapping(uint256 => mapping(uint256 => uint256)) public values; //requestId -> timestamp -> value
     mapping(uint256 => uint256[]) public timestamps; //timestamp to array of values
-    address[] public reporters;
+    mapping(uint256 => address) public reporters;
     uint256[] public availableReporterIndices;
     mapping(address => uint256) public reporterIndices;
-    mapping(uint256 => uint256[]) public latestValues;
-    mapping(uint256 => uint256[]) public latestTimestamps;
+    mapping(uint256 => mapping(uint256 => uint256)) public latestValues;
+    mapping(uint256 => mapping(uint256 => uint256)) public latestTimestamps;
     mapping(uint256 => uint256) public oldestTimestampFromLatestBlock;
     mapping(uint256 => uint256) public numberReportersFromLatestBlock;
+    uint256 public latestValuesLength;
     uint256 public numberOfReporters;
     uint256 public timeLimit;
     uint256 public quorum;
     
-    constructor(uint256 _quorum, uint256 _timeLimit) {}
+    constructor(uint256 _quorum, uint256 _timeLimit) {
+        quorum = _quorum;
+        timeLimit = _timeLimit;
+    }
     
     function addReporter(address _reporter) external {
         uint256 _newReporterIndex;
@@ -121,6 +125,7 @@ contract TellorAccessMedianized {
             availableReporterIndices.pop();
         } else {
             _newReporterIndex = numberOfReporters + 1;
+            latestValuesLength++;
         }
         reporters[_newReporterIndex] = _reporter;
         reporterIndices[_reporter] = _newReporterIndex;
@@ -211,7 +216,7 @@ contract TellorAccessMedianized {
         uint256 _numberOfValidReports;
         uint256 _oldestTimestamp = block.timestamp;
         
-        for(uint256 i=1; i<=latestValues[_requestId].length; i++) {
+        for(uint256 i=1; i<=latestValuesLength; i++) {
             if(latestTimestamps[_requestId][i] > block.timestamp - timeLimit) {
                 _validReports[_numberOfValidReports] = latestValues[_requestId][i];
                 _numberOfValidReports++;
