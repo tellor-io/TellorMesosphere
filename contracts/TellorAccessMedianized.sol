@@ -1,124 +1,65 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.7.0;
 
-library SafeMath {
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./Select.sol";
 
-  /**
-  * @dev Multiplies two numbers, reverts on overflow.
-  */
-  function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-    // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
-    // benefit is lost if 'b' is also tested.
-    // See: https://github.com/OpenZeppelin/openzeppelin-solidity/pull/522
-    if (a == 0) {
-      return 0;
-    }
-
-    uint256 c = a * b;
-    require(c / a == b);
-
-    return c;
-  }
-
-  /**
-  * @dev Integer division of two numbers truncating the quotient, reverts on division by zero.
-  */
-  function div(uint256 a, uint256 b) internal pure returns (uint256) {
-    require(b > 0); // Solidity only automatically asserts when dividing by 0
-    uint256 c = a / b;
-    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-
-    return c;
-  }
-
-  /**
-  * @dev Subtracts two numbers, reverts on overflow (i.e. if subtrahend is greater than minuend).
-  */
-  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-    require(b <= a);
-    uint256 c = a - b;
-
-    return c;
-  }
-
-  /**
-  * @dev Adds two numbers, reverts on overflow.
-  */
-  function add(uint256 a, uint256 b) internal pure returns (uint256) {
-    uint256 c = a + b;
-    require(c >= a);
-
-    return c;
-  }
-
-  /**
-  * @dev Divides two numbers and returns the remainder (unsigned integer modulo),
-  * reverts when dividing by zero.
-  */
-  function mod(uint256 a, uint256 b) internal pure returns (uint256) {
-    require(b != 0);
-    return a % b;
-  }
-}
-
-
-/**
- * @title Select
- * @dev Median Selection Library
- */
-library Select {
+contract TellorAccessMedianized is AccessControl {
+    
     using SafeMath for uint256;
-
-    /**
-     * @dev Sorts the input array up to the denoted size, and returns the median.
-     * @param array Input array to compute its median.
-     * @param size Number of elements in array to compute the median for.
-     * @return Median of array.
-     */
-    function computeMedian(uint256[] memory array, uint256 size)
-        internal
-        pure
-        returns (uint256)
-    {
-        require(size > 0 && array.length >= size);
-        for (uint256 i = 1; i < size; i++) {
-            for (uint256 j = i; j > 0 && array[j-1]  > array[j]; j--) {
-                uint256 tmp = array[j];
-                array[j] = array[j-1];
-                array[j-1] = tmp;
-            }
-        }
-        if (size % 2 == 1) {
-            return array[size / 2];
-        } else {
-            return array[size / 2].add(array[size / 2 - 1]) / 2;
-        }
-    }
-}
-
-contract TellorAccessMedianized {
     
     /*Storage*/
     mapping(uint256 => mapping(uint256 => uint256)) public values; //requestId -> timestamp -> value
     mapping(uint256 => uint256[]) public timestamps; //timestamp to array of values
     mapping(uint256 => address) public reporters;
-    uint256[] public availableReporterIndices;
     mapping(address => uint256) public reporterIndices;
     mapping(uint256 => mapping(uint256 => uint256)) public latestValues;
     mapping(uint256 => mapping(uint256 => uint256)) public latestTimestamps;
     mapping(uint256 => uint256) public oldestTimestampFromLatestBlock;
     mapping(uint256 => uint256) public numberReportersFromLatestBlock;
+    uint256[] public availableReporterIndices;
     uint256 public latestValuesLength;
     uint256 public numberOfReporters;
     uint256 public timeLimit;
     uint256 public quorum;
+    bytes32 public constant REPORTER_ROLE = keccak256("reporter");//used in access contract, the role of a given party
     
     constructor(uint256 _quorum, uint256 _timeLimit) {
         quorum = _quorum;
         timeLimit = _timeLimit;
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setRoleAdmin(REPORTER_ROLE, DEFAULT_ADMIN_ROLE);
     }
     
-    function addReporter(address _reporter) external {
+    /**
+     * @dev Modifier to restrict only to the admin role.
+    */
+    modifier onlyAdmin() {
+        require(isAdmin(msg.sender), "Restricted to admins.");
+        _;
+    }
+
+    /**
+     * @dev Restricted to members of the reporter role.
+    */
+    modifier onlyReporter() {
+        require(isReporter(msg.sender), "Restricted to reporters.");
+        _;
+    }
+    
+    /**
+     * @dev Add an address to the admin role. Restricted to admins.
+     * @param _admin_address is the admin address to add 
+    */
+    function addAdmin(address _admin_address) external virtual onlyAdmin {
+        grantRole(DEFAULT_ADMIN_ROLE, _admin_address);
+    }
+
+    /**
+     * @dev Add an account to the reporter role. Restricted to admins.
+     * @param _reporter_address is the address of the reporter to give permissions to submit data
+    */
+    function addReporter(address _reporter_address) external virtual onlyAdmin {
         uint256 _newReporterIndex;
         if(availableReporterIndices.length > 0) {
             _newReporterIndex = availableReporterIndices[availableReporterIndices.length-1];
@@ -127,12 +68,13 @@ contract TellorAccessMedianized {
             _newReporterIndex = numberOfReporters + 1;
             latestValuesLength++;
         }
-        reporters[_newReporterIndex] = _reporter;
-        reporterIndices[_reporter] = _newReporterIndex;
+        reporters[_newReporterIndex] = _reporter_address;
+        reporterIndices[_reporter_address] = _newReporterIndex;
         numberOfReporters++;
+        grantRole(REPORTER_ROLE, _reporter_address);
     }
     
-    function getCurrentValue(uint256 _requestId) external view returns (bool, uint256, uint256) {
+    function getCurrentValue1(uint256 _requestId) external view returns (bool, uint256, uint256) {
         uint256 _count = getNewValueCountbyRequestId(_requestId);
         if(numberReportersFromLatestBlock[_requestId] < numberOfReporters || 
             oldestTimestampFromLatestBlock[_requestId] > block.timestamp - timeLimit) {
@@ -146,8 +88,62 @@ contract TellorAccessMedianized {
         return (false, 0, _time);
     }
     
+    function getCurrentValue(uint256 _requestId) external view returns (bool, uint256, uint256) {
+        uint256 _count = getNewValueCountbyRequestId(_requestId);
+        uint256 _time =
+            getTimestampbyRequestIDandIndex(_requestId, _count - 1);
+        uint256 _value = retrieveData(_requestId, _time);
+        if (_value > 0) return (true, _value, _time);
+        return (false, 0, _time);
+    }
+    
+    /**
+     * @dev Allows the user to get the first value for the requestId before the specified timestamp
+     * @param _requestId is the requestId to look up the value for
+     * @param _timestamp before which to search for first verified value
+     * @return ifRetrieve bool true if it is able to retreive a value, the value, and the value's timestamp
+     * @return value the value retrieved
+     * @return timestampRetrieved the value's timestamp
+    */
+    function getDataBefore(uint256 _requestId, uint256 _timestamp) external view returns (bool, uint256, uint256) {
+        (bool _found, uint256 _index) =
+            _getIndexForDataBefore(_requestId, _timestamp);
+        if (!_found) return (false, 0, 0);
+        uint256 _time =
+            getTimestampbyRequestIDandIndex(_requestId, _index);
+        uint256 _value = retrieveData(_requestId, _time);
+        //If value is diputed it'll return zero
+        if (_value > 0) return (true, _value, _time);
+        return (false, 0, 0);
+    }
+
+    /** 
+     * @dev Remove an account from the reporter role. Restricted to admins.
+     * @param _reporter_address is the address of the reporter to remove permissions to submit data
+    */
+    function removeReporter(address _reporter_address) external virtual onlyAdmin  {
+        uint256 _reporterIndex = reporterIndices[_reporter_address];
+        reporters[_reporterIndex] = address(0);
+        reporterIndices[_reporter_address] = 0;
+        availableReporterIndices.push(_reporterIndex);
+        numberOfReporters--;
+        revokeRole(REPORTER_ROLE, _reporter_address);
+    }
+
+    /** 
+     * @dev Remove oneself from the admin role.
+    */
+    function renounceAdmin() external virtual {
+        renounceRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    }
+    
+    /**
+     * @dev Function for reporters to submit a value
+     * @param _requestId The tellorId to associate the value to
+     * @param _value the value for the requestId
+    */
     function submitValue(uint256 _requestId, uint256 _value) external {
-        // require isReporter
+        require(isReporter(msg.sender) || isAdmin(msg.sender), "Sender must be an Admin or Reporter to submitValue");
         latestValues[_requestId][reporterIndices[msg.sender]] = _value;
         latestTimestamps[_requestId][reporterIndices[msg.sender]] = block.timestamp;
 
@@ -159,12 +155,13 @@ contract TellorAccessMedianized {
             uint256 _index;
             if(_oldestTimestamp == oldestTimestampFromLatestBlock[_requestId]) {
                 _index = timestamps[_requestId].length - 1;
+                timestamps[_requestId][_index] = block.timestamp;
             } else {
                 _index = timestamps[_requestId].length;
+                timestamps[_requestId].push(block.timestamp);
                 oldestTimestampFromLatestBlock[_requestId] = _oldestTimestamp;
             }
             values[_requestId][_index] = _median;
-            timestamps[_requestId][_index] = (block.timestamp);
         }
     }
     
@@ -189,17 +186,23 @@ contract TellorAccessMedianized {
         return timestamps[_requestId][_index];
     }
     
-    /** 
-     * @dev Remove an account from the reporter role. Restricted to admins.
-     * @param _reporter_address is the address of the reporter to remove permissions to submit data
-    */
-    function removeReporter(address _reporter_address) external {
-        uint256 _reporterIndex = reporterIndices[_reporter_address];
-        reporters[_reporterIndex] = address(0);
-        reporterIndices[_reporter_address] = 0;
-        availableReporterIndices.push(_reporterIndex);
-        numberOfReporters--;
+    /**
+     * @dev Return `true` if the account belongs to the admin role.
+     * @param _admin_address is the admin address to check if they have an admin role
+     * @return true if the address has an admin role
+     */
+    function isAdmin(address _admin_address) public virtual view returns (bool) {
+        return hasRole(DEFAULT_ADMIN_ROLE, _admin_address);
     }
+
+    /**
+     * @dev Return `true` if the account belongs to the reporter role.
+     * @param _reporter_address is the address to check if they have a reporter role
+     */
+    function isReporter(address _reporter_address) public virtual view returns (bool)  {
+        return hasRole(REPORTER_ROLE, _reporter_address);
+    }
+
     
     /**
      * @dev Retrieve value from oracle based on requestId/timestamp
@@ -209,6 +212,65 @@ contract TellorAccessMedianized {
     */
     function retrieveData(uint256 _requestId, uint256 _timestamp) public view returns(uint256){
         return values[_requestId][_timestamp];
+    }
+    
+    /**
+     * @dev Allows the user to get the index for the requestId for the specified timestamp
+     * @param _requestId is the requestId to look up the idex based on the _timestamp provided
+     * @param _timestamp before which to search for the index
+     * @return found true for index found
+     * @return index of the timestamp
+     */
+    function _getIndexForDataBefore(uint256 _requestId, uint256 _timestamp) internal view returns (bool, uint256) {
+        uint256 _count = getNewValueCountbyRequestId(_requestId);
+        if (_count > 0) {
+            uint256 middle;
+            uint256 start = 0;
+            uint256 end = _count - 1;
+            uint256 _time;
+            //Checking Boundaries to short-circuit the algorithm
+            _time = getTimestampbyRequestIDandIndex(_requestId, start);
+            if (_time >= _timestamp) return (false, 0);
+            _time = getTimestampbyRequestIDandIndex(_requestId, end);
+            if (_time < _timestamp) return (true, end);
+            //Since the value is within our boundaries, do a binary search
+            while (true) {
+                middle = (end - start) / 2 + 1 + start;
+                _time = getTimestampbyRequestIDandIndex(
+                    _requestId,
+                    middle
+                );
+                if (_time < _timestamp) {
+                    //get next value
+                    uint256 _nextTime =
+                        getTimestampbyRequestIDandIndex(
+                            _requestId,
+                            middle + 1
+                        );
+                    if (_nextTime >= _timestamp) {
+                        //_time is correct
+                        return (true, middle);
+                    } else {
+                        //look from middle + 1(next value) to end
+                        start = middle + 1;
+                    }
+                } else {
+                    uint256 _prevTime =
+                        getTimestampbyRequestIDandIndex(
+                            _requestId,
+                            middle - 1
+                        );
+                    if (_prevTime < _timestamp) {
+                        // _prevtime is correct
+                        return (true, middle - 1);
+                    } else {
+                        //look from start to middle -1(prev value)
+                        end = middle - 1;
+                    }
+                }
+            }
+        }
+        return (false, 0);
     }
     
     function getNewMedian(uint256 _requestId) public view returns(bool, uint256, uint256) {
