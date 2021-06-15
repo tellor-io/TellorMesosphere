@@ -60,6 +60,7 @@ contract TellorAccessMedianized is AccessControl {
      * @param _reporter_address is the address of the reporter to give permissions to submit data
     */
     function addReporter(address _reporter_address) external virtual onlyAdmin {
+        require(!isReporter(_reporter_address), "Address already has reporter role");
         uint256 _newReporterIndex;
         if(availableReporterIndices.length > 0) {
             _newReporterIndex = availableReporterIndices[availableReporterIndices.length-1];
@@ -76,7 +77,7 @@ contract TellorAccessMedianized is AccessControl {
     
     function getCurrentValue1(uint256 _requestId) external view returns (bool, uint256, uint256) {
         uint256 _count = getNewValueCountbyRequestId(_requestId);
-        if(numberReportersFromLatestBlock[_requestId] < numberOfReporters || 
+        if(numberReportersFromLatestBlock[_requestId] < numberOfReporters && 
             oldestTimestampFromLatestBlock[_requestId] > block.timestamp - timeLimit) {
             _count--;
         } 
@@ -143,11 +144,11 @@ contract TellorAccessMedianized is AccessControl {
      * @param _value the value for the requestId
     */
     function submitValue(uint256 _requestId, uint256 _value) external {
-        require(isReporter(msg.sender) || isAdmin(msg.sender), "Sender must be an Admin or Reporter to submitValue");
+        require(isReporter(msg.sender), "Sender must be a Reporter to submitValue");
         latestValues[_requestId][reporterIndices[msg.sender]] = _value;
         latestTimestamps[_requestId][reporterIndices[msg.sender]] = block.timestamp;
 
-        (bool _ifRetrieve, uint256 _median, uint256 _oldestTimestamp) = getNewMedian(_requestId);
+        (bool _ifRetrieve, uint256 _median, uint256 _oldestTimestamp, uint256 _numberOfValidReports) = getNewMedian(_requestId);
         
         // Check whether nReporters of latest blockMedian >= min(5, totalReporters)
         // if TRUE, create new block
@@ -155,13 +156,16 @@ contract TellorAccessMedianized is AccessControl {
             uint256 _index;
             if(_oldestTimestamp == oldestTimestampFromLatestBlock[_requestId]) {
                 _index = timestamps[_requestId].length - 1;
+                uint256 _previousTimestamp = timestamps[_requestId][_index];
+                values[_requestId][_previousTimestamp] = 0;
                 timestamps[_requestId][_index] = block.timestamp;
             } else {
                 _index = timestamps[_requestId].length;
                 timestamps[_requestId].push(block.timestamp);
                 oldestTimestampFromLatestBlock[_requestId] = _oldestTimestamp;
             }
-            values[_requestId][_index] = _median;
+            values[_requestId][block.timestamp] = _median;
+            numberReportersFromLatestBlock[_requestId] = _numberOfValidReports;
         }
     }
     
@@ -273,7 +277,7 @@ contract TellorAccessMedianized is AccessControl {
         return (false, 0);
     }
     
-    function getNewMedian(uint256 _requestId) public view returns(bool, uint256, uint256) {
+    function getNewMedian(uint256 _requestId) public view returns(bool, uint256, uint256, uint256) {
         uint256[] memory _validReports = new uint256[](numberOfReporters);
         uint256 _numberOfValidReports;
         uint256 _oldestTimestamp = block.timestamp;
@@ -289,9 +293,9 @@ contract TellorAccessMedianized is AccessControl {
         }
         
         if(_numberOfValidReports >= quorum) {
-            return(true, Select.computeMedian(_validReports, _numberOfValidReports), _oldestTimestamp);
+            return(true, Select.computeMedian(_validReports, _numberOfValidReports), _oldestTimestamp, _numberOfValidReports);
         } else {
-            return(false, 0, 0);
+            return(false, 0, 0, _numberOfValidReports);
         }
     }
 
