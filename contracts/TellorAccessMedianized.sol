@@ -2,7 +2,7 @@
 pragma solidity 0.7.0;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./Select.sol";
+import "./SafeMath.sol";
 
 contract TellorAccessMedianized is AccessControl {
     
@@ -21,12 +21,14 @@ contract TellorAccessMedianized is AccessControl {
     uint256 public latestValuesLength;
     uint256 public numberOfReporters;
     uint256 public timeLimit;
+    uint256 public maximumDeviation;
     uint256 public quorum;
     bytes32 public constant REPORTER_ROLE = keccak256("reporter");//used in access contract, the role of a given party
     
-    constructor(uint256 _quorum, uint256 _timeLimit) {
+    constructor(uint256 _quorum, uint256 _timeLimit, uint256 _maximumDeviation) {
         quorum = _quorum;
         timeLimit = _timeLimit;
+        maximumDeviation = _maximumDeviation;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(REPORTER_ROLE, DEFAULT_ADMIN_ROLE);
     }
@@ -75,22 +77,13 @@ contract TellorAccessMedianized is AccessControl {
         grantRole(REPORTER_ROLE, _reporter_address);
     }
     
-    function getCurrentValue1(uint256 _requestId) external view returns (bool, uint256, uint256) {
+    function getCurrentValue(uint256 _requestId) external view returns (bool, uint256, uint256) {
         uint256 _count = getNewValueCountbyRequestId(_requestId);
         if(numberReportersFromLatestBlock[_requestId] < numberOfReporters && 
             oldestTimestampFromLatestBlock[_requestId] > block.timestamp - timeLimit) {
             _count--;
         } 
         
-        uint256 _time =
-            getTimestampbyRequestIDandIndex(_requestId, _count - 1);
-        uint256 _value = retrieveData(_requestId, _time);
-        if (_value > 0) return (true, _value, _time);
-        return (false, 0, _time);
-    }
-    
-    function getCurrentValue(uint256 _requestId) external view returns (bool, uint256, uint256) {
-        uint256 _count = getNewValueCountbyRequestId(_requestId);
         uint256 _time =
             getTimestampbyRequestIDandIndex(_requestId, _count - 1);
         uint256 _value = retrieveData(_requestId, _time);
@@ -282,23 +275,40 @@ contract TellorAccessMedianized is AccessControl {
         uint256 _numberOfValidReports;
         uint256 _oldestTimestamp = block.timestamp;
         
-        for(uint256 i=1; i<=latestValuesLength; i++) {
-            if(latestTimestamps[_requestId][i] > block.timestamp - timeLimit) {
-                _validReports[_numberOfValidReports] = latestValues[_requestId][i];
+        for(uint256 k=1; k<=latestValuesLength; k++) {
+            if(latestTimestamps[_requestId][k] > block.timestamp - timeLimit) {
+                _validReports[_numberOfValidReports] = latestValues[_requestId][k];
                 _numberOfValidReports++;
-                if(latestTimestamps[_requestId][i] < _oldestTimestamp) {
-                    _oldestTimestamp = latestTimestamps[_requestId][i];
+                if(latestTimestamps[_requestId][k] < _oldestTimestamp) {
+                    _oldestTimestamp = latestTimestamps[_requestId][k];
                 }
             }
         }
-        
-        if(_numberOfValidReports >= quorum) {
-            return(true, Select.computeMedian(_validReports, _numberOfValidReports), _oldestTimestamp, _numberOfValidReports);
-        } else {
+        if(_numberOfValidReports < quorum) {
             return(false, 0, 0, _numberOfValidReports);
+        } else {
+            for (uint256 i = 1; i < _numberOfValidReports; i++) {
+                for (uint256 j = i; j > 0 && _validReports[j-1]  > _validReports[j]; j--) {
+                    uint256 tmp = _validReports[j];
+                    _validReports[j] = _validReports[j-1];
+                    _validReports[j-1] = tmp;
+                }
+            }
+            uint256 _count = getNewValueCountbyRequestId(_requestId);
+            uint256 _lastTimestamp = getTimestampbyRequestIDandIndex(_requestId, _count-1);
+            uint256 _lastValue = values[_requestId][_lastTimestamp];
+            if(_lastValue > 0) {
+                if ((_validReports[_numberOfValidReports-1] - _validReports[0]) * 10000 / _lastValue > maximumDeviation) {
+                    return(false, 0, 0, _numberOfValidReports);
+                }
+            }
+            uint256 _median;
+            if (_numberOfValidReports % 2 == 1) {
+                 _median = _validReports[_numberOfValidReports / 2];
+            } else {
+                _median = _validReports[_numberOfValidReports / 2].add(_validReports[_numberOfValidReports / 2 - 1]) / 2;
+            }
+            return(true, _median, _oldestTimestamp, _numberOfValidReports);
         }
     }
-
-    
-    
 }
