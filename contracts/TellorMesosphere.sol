@@ -4,7 +4,7 @@ pragma solidity 0.7.0;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./SafeMath.sol";
 
-contract TellorMezzo is AccessControl {
+contract TellorMesosphere is AccessControl {
     
     using SafeMath for uint256;
     

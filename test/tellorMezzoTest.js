@@ -26,10 +26,28 @@ describe("TellorAccessMedianized", function() {
   it("Should get median", async function() {
     await accessMedianized.addReporter(addr1.address);
     await accessMedianized.addReporter(addr2.address);
+    await accessMedianized.addReporter(addr3.address);
+    await accessMedianized.addReporter(addr4.address);
+    await accessMedianized.addReporter(addr5.address);
 
     await accessMedianized.connect(addr1).submitValue(REQUEST_ID_1, 100);
-    await accessMedianized.connect(addr2).submitValue(REQUEST_ID_1, 200);
     let getCurrentValueResponse = await accessMedianized.getCurrentValue(REQUEST_ID_1);
+    console.log("Current value1: " + getCurrentValueResponse[1]);
+    await accessMedianized.connect(addr2).submitValue(REQUEST_ID_1, 100);
+    getCurrentValueResponse = await accessMedianized.getCurrentValue(REQUEST_ID_1);
+    console.log("Current value2: " + getCurrentValueResponse[1]);
+    await accessMedianized.connect(addr3).submitValue(REQUEST_ID_1, 150);
+    getCurrentValueResponse = await accessMedianized.getCurrentValue(REQUEST_ID_1);
+    console.log("Current value3: " + getCurrentValueResponse[1]);
+    await accessMedianized.connect(addr4).submitValue(REQUEST_ID_1, 200);
+    getCurrentValueResponse = await accessMedianized.getCurrentValue(REQUEST_ID_1);
+    console.log("Current value4: " + getCurrentValueResponse[1]);
+    await accessMedianized.connect(addr5).submitValue(REQUEST_ID_1, 200);
+    getCurrentValueResponse = await accessMedianized.getCurrentValue(REQUEST_ID_1);
+    console.log("Current value5: " + getCurrentValueResponse[1]);
+
+    await time.increase(TIME_LIMIT + 1);
+    console.log("Current value00: " + getCurrentValueResponse[1]);
     expect(getCurrentValueResponse[1]).to.equal(150);
   });
 
