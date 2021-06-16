@@ -4,7 +4,7 @@ pragma solidity 0.7.0;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./SafeMath.sol";
 
-contract TellorAccessMedianized is AccessControl {
+contract TellorMezzo is AccessControl {
     
     using SafeMath for uint256;
     
@@ -77,6 +77,21 @@ contract TellorAccessMedianized is AccessControl {
         grantRole(REPORTER_ROLE, _reporter_address);
     }
     
+    /**
+     * @dev Allows admin to change quorum variable
+     * @param _quorum is the new quorum value
+     */
+    function updateQuorum(uint256 _quorum) external onlyAdmin {
+        quorum = _quorum;
+    }
+    
+     /**
+     * @dev Allows the user to get the latest value for the requestId specified
+     * @param _requestId is the requestId to look up the value for
+     * @return ifRetrieve bool true if it is able to retreive a value, the value, and the value's timestamp
+     * @return value the value retrieved
+     * @return timestampRetrieved the value's timestamp
+    */
     function getCurrentValue(uint256 _requestId) external view returns (bool, uint256, uint256) {
         uint256 _count = getNewValueCountbyRequestId(_requestId);
         if(numberReportersFromLatestBlock[_requestId] < numberOfReporters && 
@@ -136,8 +151,8 @@ contract TellorAccessMedianized is AccessControl {
      * @param _requestId The tellorId to associate the value to
      * @param _value the value for the requestId
     */
-    function submitValue(uint256 _requestId, uint256 _value) external {
-        require(isReporter(msg.sender), "Sender must be a Reporter to submitValue");
+    function submitValue(uint256 _requestId, uint256 _value) external onlyReporter {
+        // require(isReporter(msg.sender), "Sender must be a Reporter to submitValue");
         latestValues[_requestId][reporterIndices[msg.sender]] = _value;
         latestTimestamps[_requestId][reporterIndices[msg.sender]] = block.timestamp;
 
@@ -213,7 +228,7 @@ contract TellorAccessMedianized is AccessControl {
     
     /**
      * @dev Allows the user to get the index for the requestId for the specified timestamp
-     * @param _requestId is the requestId to look up the idex based on the _timestamp provided
+     * @param _requestId is the requestId to look up the index based on the _timestamp provided
      * @param _timestamp before which to search for the index
      * @return found true for index found
      * @return index of the timestamp
@@ -270,14 +285,24 @@ contract TellorAccessMedianized is AccessControl {
         return (false, 0);
     }
     
-    function getNewMedian(uint256 _requestId) public view returns(bool, uint256, uint256, uint256) {
+    /**
+     * @dev Calculates new median if enough values have been submitted within timeLimit to reach quorum and 
+     * @param _requestId is the requestId to calculate the median for
+     * @return bool true if a new valid median could be calculated
+     * @return uint256 the newly calculated median value
+     * @return uint256 the timestamp of the oldest value used to calculate this new median
+     * @return uint256 the quantity of valid reports used to calculate this new median
+     */
+    function getNewMedian(uint256 _requestId) public returns(bool, uint256, uint256, uint256) {
         uint256[] memory _validReports = new uint256[](numberOfReporters);
+        uint256[] memory _validReportIndices = new uint256[](numberOfReporters);
         uint256 _numberOfValidReports;
         uint256 _oldestTimestamp = block.timestamp;
         
         for(uint256 k=1; k<=latestValuesLength; k++) {
             if(latestTimestamps[_requestId][k] > block.timestamp - timeLimit) {
                 _validReports[_numberOfValidReports] = latestValues[_requestId][k];
+                _validReportIndices[_numberOfValidReports] = k;
                 _numberOfValidReports++;
                 if(latestTimestamps[_requestId][k] < _oldestTimestamp) {
                     _oldestTimestamp = latestTimestamps[_requestId][k];
@@ -290,8 +315,11 @@ contract TellorAccessMedianized is AccessControl {
             for (uint256 i = 1; i < _numberOfValidReports; i++) {
                 for (uint256 j = i; j > 0 && _validReports[j-1]  > _validReports[j]; j--) {
                     uint256 tmp = _validReports[j];
+                    uint256 tmpIndices = _validReportIndices[j];
                     _validReports[j] = _validReports[j-1];
+                    _validReportIndices[j] = _validReportIndices[j-1];
                     _validReports[j-1] = tmp;
+                    _validReportIndices[j-1] = tmpIndices;
                 }
             }
             uint256 _count = getNewValueCountbyRequestId(_requestId);
@@ -299,7 +327,18 @@ contract TellorAccessMedianized is AccessControl {
             uint256 _lastValue = values[_requestId][_lastTimestamp];
             if(_lastValue > 0) {
                 if ((_validReports[_numberOfValidReports-1] - _validReports[0]) * 10000 / _lastValue > maximumDeviation) {
-                    return(false, 0, 0, _numberOfValidReports);
+                    if (_numberOfValidReports-1 >= quorum) {
+                        if(max(_validReports[_numberOfValidReports-1], _lastValue) - min(_validReports[_numberOfValidReports-1], _lastValue) >
+                            max(_validReports[0], _lastValue) - min(_validReports[0], _lastValue)) {
+                            latestTimestamps[_requestId][_validReportIndices[_numberOfValidReports-1]] = 0;
+                        } else {
+                            latestTimestamps[_requestId][_validReportIndices[0]] = 0;
+                        }
+                        return(getNewMedian(_requestId));
+                    } else {
+                        return(false, 0, 0, _numberOfValidReports);
+                    }
+                    
                 }
             }
             uint256 _median;
@@ -309,6 +348,22 @@ contract TellorAccessMedianized is AccessControl {
                 _median = _validReports[_numberOfValidReports / 2].add(_validReports[_numberOfValidReports / 2 - 1]) / 2;
             }
             return(true, _median, _oldestTimestamp, _numberOfValidReports);
+        }
+    }
+    
+    function max(uint256 _a, uint256 _b) public pure returns(uint256) {
+        if(_a > _b) {
+            return(_a);
+        } else {
+            return(_b);
+        }
+    }
+    
+    function min(uint256 _a, uint256 _b) public pure returns(uint256) {
+        if(_a < _b) {
+            return(_a);
+        } else {
+            return(_b);
         }
     }
 }
