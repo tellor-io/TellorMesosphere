@@ -293,7 +293,7 @@ contract TellorMesosphere is AccessControl {
      * @return uint256 the timestamp of the oldest value used to calculate this new median
      * @return uint256 the quantity of valid reports used to calculate this new median
      */
-    function getNewMedian(uint256 _requestId) public returns(bool, uint256, uint256, uint256) {
+    function getNewMedian(uint256 _requestId) internal returns(bool, uint256, uint256, uint256) {
         uint256[] memory _validReports = new uint256[](numberOfReporters);
         uint256[] memory _validReportIndices = new uint256[](numberOfReporters);
         uint256 _numberOfValidReports;
@@ -322,9 +322,6 @@ contract TellorMesosphere is AccessControl {
                     _validReportIndices[j-1] = tmpIndices;
                 }
             }
-            // uint256 _count = getNewValueCountbyRequestId(_requestId);
-            // uint256 _lastTimestamp = getTimestampbyRequestIDandIndex(_requestId, _count-1);
-            // uint256 _lastValue = values[_requestId][_lastTimestamp];
             (,uint256 _lastValue,) = getCurrentValue(_requestId);
             if(_lastValue > 0) {
                 if ((_validReports[_numberOfValidReports-1] - _validReports[0]) * 10000 / _lastValue > maximumDeviation) {
