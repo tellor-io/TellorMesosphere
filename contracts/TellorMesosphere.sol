@@ -3,6 +3,7 @@ pragma solidity 0.7.0;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./SafeMath.sol";
+import "hardhat/console.sol";
 
 contract TellorMesosphere is AccessControl {
     
@@ -86,6 +87,14 @@ contract TellorMesosphere is AccessControl {
     }
     
      /**
+     * @dev Allows admin to change maximumDeviation variable
+     * @param _maximumDeviation is the new maximumDeviation value
+     */
+    function updateMaximumDeviation(uint256 _maximumDeviation) external onlyAdmin {
+        maximumDeviation = _maximumDeviation;
+    }
+    
+     /**
      * @dev Allows the user to get the latest value for the requestId specified
      * @param _requestId is the requestId to look up the value for
      * @return ifRetrieve bool true if it is able to retreive a value, the value, and the value's timestamp
@@ -156,19 +165,17 @@ contract TellorMesosphere is AccessControl {
         latestValues[_requestId][reporterIndices[msg.sender]] = _value;
         latestTimestamps[_requestId][reporterIndices[msg.sender]] = block.timestamp;
 
-        (bool _ifRetrieve, uint256 _median, uint256 _oldestTimestamp, uint256 _numberOfValidReports) = getNewMedian(_requestId);
+        (bool _ifRetrieve, uint256 _median, uint256 _oldestTimestamp, uint256 _numberOfValidReports) = _getNewMedian(_requestId);
         
         // Check whether nReporters of latest blockMedian >= min(5, totalReporters)
         // if TRUE, create new block
         if(_ifRetrieve) {
-            uint256 _index;
             if(_oldestTimestamp == oldestTimestampFromLatestBlock[_requestId]) {
-                _index = timestamps[_requestId].length - 1;
+                uint256 _index = timestamps[_requestId].length - 1;
                 uint256 _previousTimestamp = timestamps[_requestId][_index];
                 values[_requestId][_previousTimestamp] = 0;
                 timestamps[_requestId][_index] = block.timestamp;
             } else {
-                _index = timestamps[_requestId].length;
                 timestamps[_requestId].push(block.timestamp);
                 oldestTimestampFromLatestBlock[_requestId] = _oldestTimestamp;
             }
@@ -293,7 +300,7 @@ contract TellorMesosphere is AccessControl {
      * @return uint256 the timestamp of the oldest value used to calculate this new median
      * @return uint256 the quantity of valid reports used to calculate this new median
      */
-    function getNewMedian(uint256 _requestId) internal returns(bool, uint256, uint256, uint256) {
+    function _getNewMedian(uint256 _requestId) internal returns(bool, uint256, uint256, uint256) {
         uint256[] memory _validReports = new uint256[](numberOfReporters);
         uint256[] memory _validReportIndices = new uint256[](numberOfReporters);
         uint256 _numberOfValidReports;
@@ -332,7 +339,7 @@ contract TellorMesosphere is AccessControl {
                         } else {
                             latestTimestamps[_requestId][_validReportIndices[0]] = 0;
                         }
-                        return(getNewMedian(_requestId));
+                        return(_getNewMedian(_requestId));
                     } else {
                         return(false, 0, 0, _numberOfValidReports);
                     }
