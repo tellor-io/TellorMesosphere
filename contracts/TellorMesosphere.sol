@@ -103,7 +103,7 @@ contract TellorMesosphere is AccessControl {
     */
     function getCurrentValue(uint256 _requestId) public view returns (bool, uint256, uint256) {
         uint256 _count = getNewValueCountbyRequestId(_requestId);
-        if(numberReportersFromLatestBlock[_requestId] < numberOfReporters && 
+        if(numberReportersFromLatestBlock[_requestId] < min(numberOfReporters, 5) && 
             oldestTimestampFromLatestBlock[_requestId] > block.timestamp - timeLimit) {
             _count--;
         } 
@@ -161,16 +161,13 @@ contract TellorMesosphere is AccessControl {
      * @param _value the value for the requestId
     */
     function submitValue(uint256 _requestId, uint256 _value) external onlyReporter {
-        // require(isReporter(msg.sender), "Sender must be a Reporter to submitValue");
         latestValues[_requestId][reporterIndices[msg.sender]] = _value;
         latestTimestamps[_requestId][reporterIndices[msg.sender]] = block.timestamp;
 
         (bool _ifRetrieve, uint256 _median, uint256 _oldestTimestamp, uint256 _numberOfValidReports) = _getNewMedian(_requestId);
         
-        // Check whether nReporters of latest blockMedian >= min(5, totalReporters)
-        // if TRUE, create new block
         if(_ifRetrieve) {
-            if(_oldestTimestamp == oldestTimestampFromLatestBlock[_requestId]) {
+            if(_oldestTimestamp == oldestTimestampFromLatestBlock[_requestId] && numberReportersFromLatestBlock[_requestId] < numberOfReporters) {
                 uint256 _index = timestamps[_requestId].length - 1;
                 uint256 _previousTimestamp = timestamps[_requestId][_index];
                 values[_requestId][_previousTimestamp] = 0;
@@ -309,15 +306,14 @@ contract TellorMesosphere is AccessControl {
         for(uint256 k=1; k<=latestValuesLength; k++) {
             if(latestTimestamps[_requestId][k] > block.timestamp - timeLimit) {
                 _validReports[_numberOfValidReports] = latestValues[_requestId][k];
-                _validReportIndices[_numberOfValidReports] = k;
-                _numberOfValidReports++;
+                _validReportIndices[_numberOfValidReports++] = k;
                 if(latestTimestamps[_requestId][k] < _oldestTimestamp) {
                     _oldestTimestamp = latestTimestamps[_requestId][k];
                 }
             }
         }
         if(_numberOfValidReports < quorum) {
-            return(false, 0, 0, _numberOfValidReports);
+            return(false, 0, 0, 0);
         } else {
             for (uint256 i = 1; i < _numberOfValidReports; i++) {
                 for (uint256 j = i; j > 0 && _validReports[j-1]  > _validReports[j]; j--) {
@@ -341,7 +337,7 @@ contract TellorMesosphere is AccessControl {
                         }
                         return(_getNewMedian(_requestId));
                     } else {
-                        return(false, 0, 0, _numberOfValidReports);
+                        return(false, 0, 0, 0);
                     }
                     
                 }

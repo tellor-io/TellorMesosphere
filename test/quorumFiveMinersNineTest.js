@@ -9,7 +9,7 @@ const REQUEST_ID_2 = 2;
 
 
 
-describe("TellorMesosphere Quorum 5 Miners 5", function() {
+describe("TellorMesosphere Quorum 5 Miners 9", function() {
   let mesosphere;
   let owner, addr1, addr2, addr3, addr4, addr5, addr6, addr7, addr8, addr9;
 
@@ -24,6 +24,10 @@ describe("TellorMesosphere Quorum 5 Miners 5", function() {
     await mesosphere.addReporter(addr3.address);
     await mesosphere.addReporter(addr4.address);
     await mesosphere.addReporter(addr5.address);
+    await mesosphere.addReporter(addr6.address);
+    await mesosphere.addReporter(addr7.address);
+    await mesosphere.addReporter(addr8.address);
+    await mesosphere.addReporter(addr9.address);
   });
 
   it("Test quorum", async function() {
@@ -43,23 +47,30 @@ describe("TellorMesosphere Quorum 5 Miners 5", function() {
   });
 
   it("Test all miners update", async function() {
-    await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 90);
-    await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 95);
-    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 100);
-    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 105);
-    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 110);
+    await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 96);
+    await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 97);
+    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 98);
+    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 99);
+    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 100);
+    await mesosphere.connect(addr6).submitValue(REQUEST_ID_1, 101);
+    await mesosphere.connect(addr7).submitValue(REQUEST_ID_1, 102);
+    await mesosphere.connect(addr8).submitValue(REQUEST_ID_1, 103);
+    await mesosphere.connect(addr9).submitValue(REQUEST_ID_1, 104);
 
     let currentValue = await mesosphere.getCurrentValue(REQUEST_ID_1);
     expect(currentValue[1]).to.equal(100);
   });
 
   it("Test all miners update with wild values", async function() {
-    await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 90);
-    await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 95);
-    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 100);
-    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 105);
-    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 110);
-
+    await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 96);
+    await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 97);
+    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 98);
+    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 99);
+    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 100);
+    await mesosphere.connect(addr6).submitValue(REQUEST_ID_1, 101);
+    await mesosphere.connect(addr7).submitValue(REQUEST_ID_1, 102);
+    await mesosphere.connect(addr8).submitValue(REQUEST_ID_1, 103);
+    await mesosphere.connect(addr9).submitValue(REQUEST_ID_1, 104);
     let currentValue = await mesosphere.getCurrentValue(REQUEST_ID_1);
     expect(currentValue[1]).to.equal(100);
 
@@ -70,14 +81,38 @@ describe("TellorMesosphere Quorum 5 Miners 5", function() {
     await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 1);
     await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 5);
     await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 17000000);
-
+    await mesosphere.connect(addr6).submitValue(REQUEST_ID_1, 1010);
+    await mesosphere.connect(addr7).submitValue(REQUEST_ID_1, 24);
+    await mesosphere.connect(addr8).submitValue(REQUEST_ID_1, 345215674);
+    await mesosphere.connect(addr9).submitValue(REQUEST_ID_1, 300);
     currentValue = await mesosphere.getCurrentValue(REQUEST_ID_1);
     expect(currentValue[1]).to.equal(100);
 
     await time.increase(TIME_LIMIT+1);
 
+    await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 900);
+    await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 9500);
+    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 1);
+    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 5);
+    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 17000000);
+    await mesosphere.connect(addr6).submitValue(REQUEST_ID_1, 1010);
+    await mesosphere.connect(addr7).submitValue(REQUEST_ID_1, 24);
+    await mesosphere.connect(addr8).submitValue(REQUEST_ID_1, 345215674);
+    await mesosphere.connect(addr9).submitValue(REQUEST_ID_1, 300);
     currentValue = await mesosphere.getCurrentValue(REQUEST_ID_1);
     expect(currentValue[1]).to.equal(100);
+
+    await mesosphere.connect(addr7).submitValue(REQUEST_ID_1, 97);
+    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 98);
+    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 99);
+    await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 100);
+    await mesosphere.connect(addr9).submitValue(REQUEST_ID_1, 101);
+    await mesosphere.connect(addr8).submitValue(REQUEST_ID_1, 102);
+    await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 103);
+    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 104);
+    await mesosphere.connect(addr6).submitValue(REQUEST_ID_1, 105);
+    currentValue = await mesosphere.getCurrentValue(REQUEST_ID_1);
+    expect(currentValue[1]).to.equal(101);
   });
 
   it("Test three malicious miners and two honest miners", async function() {
@@ -149,7 +184,7 @@ describe("TellorMesosphere Quorum 5 Miners 5", function() {
     await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 117);
     await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 116);
     currentValue = await mesosphere.getCurrentValue(REQUEST_ID_1);
-    // expect(currentValue[1]).to.equal(118);
+    expect(currentValue[1]).to.equal(118);
 
     await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 103);
     await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 104);
@@ -165,45 +200,54 @@ describe("TellorMesosphere Quorum 5 Miners 5", function() {
   });
 
   it("Test fast drop", async function() {
-    await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 90);
-    await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 95);
-    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 100);
-    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 105);
-    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 110);
+    await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 96);
+    await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 97);
+    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 98);
+    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 99);
+    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 100);
+    await mesosphere.connect(addr6).submitValue(REQUEST_ID_1, 101);
+    await mesosphere.connect(addr7).submitValue(REQUEST_ID_1, 102);
+    await mesosphere.connect(addr8).submitValue(REQUEST_ID_1, 103);
+    await mesosphere.connect(addr9).submitValue(REQUEST_ID_1, 104);
+
     let currentValue = await mesosphere.getCurrentValue(REQUEST_ID_1);
     expect(currentValue[1]).to.equal(100);
 
     await time.increase(TIME_LIMIT+1);
 
-    await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 97);
-    await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 98);
-    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 100);
-    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 101);
-    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 102);
+    await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 96);
+    await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 97);
+    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 98);
+    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 99);
+    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 100);
+    await mesosphere.connect(addr6).submitValue(REQUEST_ID_1, 101);
+    await mesosphere.connect(addr7).submitValue(REQUEST_ID_1, 102);
+    await mesosphere.connect(addr8).submitValue(REQUEST_ID_1, 103);
+    await mesosphere.connect(addr9).submitValue(REQUEST_ID_1, 104);
     currentValue = await mesosphere.getCurrentValue(REQUEST_ID_1);
     expect(currentValue[1]).to.equal(100);
 
     await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 88);
     await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 89);
-    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 90);
-    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 91);
-    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 92);
+    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 89);
+    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 90);
+    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 90);
+    await mesosphere.connect(addr6).submitValue(REQUEST_ID_1, 90);
+    await mesosphere.connect(addr7).submitValue(REQUEST_ID_1, 91);
+    await mesosphere.connect(addr8).submitValue(REQUEST_ID_1, 91);
+    await mesosphere.connect(addr9).submitValue(REQUEST_ID_1, 92);
     currentValue = await mesosphere.getCurrentValue(REQUEST_ID_1);
     expect(currentValue[1]).to.equal(90);
 
-    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 90);
+    await mesosphere.connect(addr9).submitValue(REQUEST_ID_1, 100);
+    await mesosphere.connect(addr8).submitValue(REQUEST_ID_1, 100);
+    await mesosphere.connect(addr7).submitValue(REQUEST_ID_1, 101);
+    await mesosphere.connect(addr6).submitValue(REQUEST_ID_1, 99);
+    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 99);
     await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 98);
     await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 100);
     await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 101);
     await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 102);
-    currentValue = await mesosphere.getCurrentValue(REQUEST_ID_1);
-    expect(currentValue[1]).to.equal(100);
-
-    await mesosphere.connect(addr3).submitValue(REQUEST_ID_1, 98);
-    await mesosphere.connect(addr1).submitValue(REQUEST_ID_1, 99);
-    await mesosphere.connect(addr5).submitValue(REQUEST_ID_1, 100);
-    await mesosphere.connect(addr2).submitValue(REQUEST_ID_1, 101);
-    await mesosphere.connect(addr4).submitValue(REQUEST_ID_1, 102);
     currentValue = await mesosphere.getCurrentValue(REQUEST_ID_1);
     expect(currentValue[1]).to.equal(100);
   });
