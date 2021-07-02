@@ -6,9 +6,9 @@ import "./SafeMath.sol";
 import "hardhat/console.sol";
 
 contract TellorMesosphere is AccessControl {
-    
+
     using SafeMath for uint256;
-    
+
     /*Storage*/
     mapping(uint256 => mapping(uint256 => uint256)) public values; //requestId -> timestamp -> value
     mapping(uint256 => uint256[]) public timestamps; //timestamp to array of values
@@ -25,7 +25,7 @@ contract TellorMesosphere is AccessControl {
     uint256 public maximumDeviation;
     uint256 public quorum;
     bytes32 public constant REPORTER_ROLE = keccak256("reporter");//used in access contract, the role of a given party
-    
+
     constructor(uint256 _quorum, uint256 _timeLimit, uint256 _maximumDeviation) {
         quorum = _quorum;
         timeLimit = _timeLimit;
@@ -33,7 +33,7 @@ contract TellorMesosphere is AccessControl {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(REPORTER_ROLE, DEFAULT_ADMIN_ROLE);
     }
-    
+
     /**
      * @dev Modifier to restrict only to the admin role.
     */
@@ -49,10 +49,10 @@ contract TellorMesosphere is AccessControl {
         require(isReporter(msg.sender), "Restricted to reporters.");
         _;
     }
-    
+
     /**
      * @dev Add an address to the admin role. Restricted to admins.
-     * @param _admin_address is the admin address to add 
+     * @param _admin_address is the admin address to add
     */
     function addAdmin(address _admin_address) external virtual onlyAdmin {
         grantRole(DEFAULT_ADMIN_ROLE, _admin_address);
@@ -77,7 +77,7 @@ contract TellorMesosphere is AccessControl {
         numberOfReporters++;
         grantRole(REPORTER_ROLE, _reporter_address);
     }
-    
+
     /**
      * @dev Allows admin to change quorum variable
      * @param _quorum is the new quorum value
@@ -85,7 +85,7 @@ contract TellorMesosphere is AccessControl {
     function updateQuorum(uint256 _quorum) external onlyAdmin {
         quorum = _quorum;
     }
-    
+
      /**
      * @dev Allows admin to change maximumDeviation variable
      * @param _maximumDeviation is the new maximumDeviation value
@@ -94,6 +94,14 @@ contract TellorMesosphere is AccessControl {
         maximumDeviation = _maximumDeviation;
     }
     
+    /**
+     * @dev Allows admin to change timeLimit variable
+     * @param _timeLimit is the new timeLimit value
+     */
+    function updateTimeLimit(uint256 _timeLimit) external onlyAdmin {
+        timeLimit = _timeLimit;
+    }
+
      /**
      * @dev Allows the user to get the latest value for the requestId specified
      * @param _requestId is the requestId to look up the value for
@@ -112,7 +120,7 @@ contract TellorMesosphere is AccessControl {
         if (_value > 0) return (true, _value, _time);
         return (false, 0, _time);
     }
-    
+
     /**
      * @dev Allows the user to get the first value for the requestId before the specified timestamp
      * @param _requestId is the requestId to look up the value for
@@ -121,7 +129,7 @@ contract TellorMesosphere is AccessControl {
      * @return value the value retrieved
      * @return timestampRetrieved the value's timestamp
     */
-    function getDataBefore(uint256 _requestId, uint256 _timestamp) external view returns (bool, uint256, uint256) {
+    function getDataBefore(uint256 _requestId, uint256 _timestamp) public view returns (bool, uint256, uint256) {
         //get index of submitted data of requestID at _timestamp
         (bool _found, uint256 _index) =
             _getIndexForDataBefore(_requestId, _timestamp);
@@ -137,7 +145,7 @@ contract TellorMesosphere is AccessControl {
         return (false, 0, 0);
     }
 
-    /** 
+    /**
      * @dev Remove an account from the reporter role. Restricted to admins.
      * @param _reporter_address is the address of the reporter to remove permissions to submit data
     */
@@ -150,13 +158,13 @@ contract TellorMesosphere is AccessControl {
         revokeRole(REPORTER_ROLE, _reporter_address);
     }
 
-    /** 
+    /**
      * @dev Remove oneself from the admin role.
     */
     function renounceAdmin() external virtual {
         renounceRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
-    
+
     /**
      * @dev Function for reporters to submit a value
      * @param _requestId The tellorId to associate the value to
@@ -173,7 +181,7 @@ contract TellorMesosphere is AccessControl {
         latestTimestamps[_requestId][reporterIndices[msg.sender]] = block.timestamp;
 
         (bool _ifRetrieve, uint256 _median, uint256 _oldestTimestamp, uint256 _numberOfValidReports) = _getNewMedian(_requestId);
-        
+
         if(_ifRetrieve) {
             if(_oldestTimestamp == oldestTimestampFromLatestBlock[_requestId] && numberReportersFromLatestBlock[_requestId] < numberOfReporters) {
                 uint256 _index = timestamps[_requestId].length - 1;
@@ -188,7 +196,7 @@ contract TellorMesosphere is AccessControl {
             numberReportersFromLatestBlock[_requestId] = _numberOfValidReports;
         }
     }
-    
+
     /**
      * @dev Counts the number of values that have been submited for the request
      * @param _requestId the requestId to look up
@@ -197,7 +205,7 @@ contract TellorMesosphere is AccessControl {
     function getNewValueCountbyRequestId(uint256 _requestId) public view returns(uint) {
         return timestamps[_requestId].length;
     }
-    
+
     /**
      * @dev Gets the timestamp for the value based on their index
      * @param _requestId is the requestId to look up
@@ -206,10 +214,10 @@ contract TellorMesosphere is AccessControl {
     */
     function getTimestampbyRequestIDandIndex(uint256 _requestId, uint256 _index) public view returns(uint256) {
         uint len = timestamps[_requestId].length;
-        if(len == 0 || len <= _index) return 0; 
+        if(len == 0 || len <= _index) return 0;
         return timestamps[_requestId][_index];
     }
-    
+
     /**
      * @dev Return `true` if the account belongs to the admin role.
      * @param _admin_address is the admin address to check if they have an admin role
@@ -227,7 +235,7 @@ contract TellorMesosphere is AccessControl {
         return hasRole(REPORTER_ROLE, _reporter_address);
     }
 
-    
+
     /**
      * @dev Retrieve value from oracle based on requestId/timestamp
      * @param _requestId being requested
@@ -237,7 +245,7 @@ contract TellorMesosphere is AccessControl {
     function retrieveData(uint256 _requestId, uint256 _timestamp) public view returns(uint256){
         return values[_requestId][_timestamp];
     }
-    
+
     /**
      * @dev Allows the user to get the index for the requestId for the specified timestamp
      * @param _requestId is the requestId to look up the index based on the _timestamp provided
@@ -296,9 +304,9 @@ contract TellorMesosphere is AccessControl {
         }
         return (false, 0);
     }
-    
+
     /**
-     * @dev Calculates new median if enough values have been submitted within timeLimit to reach quorum and 
+     * @dev Calculates new median if enough values have been submitted within timeLimit to reach quorum and
      * @param _requestId is the requestId to calculate the median for
      * @return bool true if a new valid median could be calculated
      * @return uint256 the newly calculated median value
@@ -310,7 +318,7 @@ contract TellorMesosphere is AccessControl {
         uint256[] memory _validReportIndices = new uint256[](numberOfReporters);
         uint256 _numberOfValidReports;
         uint256 _oldestTimestamp = block.timestamp;
-        
+
         for(uint256 k=1; k<=latestValuesLength; k++) {
             if(latestTimestamps[_requestId][k] > block.timestamp - timeLimit) {
                 _validReports[_numberOfValidReports] = latestValues[_requestId][k];
@@ -333,7 +341,7 @@ contract TellorMesosphere is AccessControl {
                     _validReportIndices[j-1] = tmpIndices;
                 }
             }
-            (,uint256 _lastValue,) = getCurrentValue(_requestId);
+            (,uint256 _lastValue,) = getDataBefore(_requestId, block.timestamp-timeLimit);
             if(_lastValue > 0) {
                 if ((_validReports[_numberOfValidReports-1] - _validReports[0]) * 10000 / _lastValue > maximumDeviation) {
                     if (_numberOfValidReports-1 >= quorum) {
@@ -347,7 +355,7 @@ contract TellorMesosphere is AccessControl {
                     } else {
                         return(false, 0, 0, 0);
                     }
-                    
+
                 }
             }
             uint256 _median;
@@ -359,7 +367,7 @@ contract TellorMesosphere is AccessControl {
             return(true, _median, _oldestTimestamp, _numberOfValidReports);
         }
     }
-    
+
     function max(uint256 _a, uint256 _b) public pure returns(uint256) {
         if(_a > _b) {
             return(_a);
@@ -367,7 +375,7 @@ contract TellorMesosphere is AccessControl {
             return(_b);
         }
     }
-    
+
     function min(uint256 _a, uint256 _b) public pure returns(uint256) {
         if(_a < _b) {
             return(_a);
