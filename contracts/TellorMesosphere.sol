@@ -102,14 +102,12 @@ contract TellorMesosphere is AccessControl {
      * @return timestampRetrieved the value's timestamp
     */
     function getCurrentValue(uint256 _requestId) public view returns (bool, uint256, uint256) {
+        //get index (number of submitted values on requestId) from storage
         uint256 _count = getNewValueCountbyRequestId(_requestId);
-        if(numberReportersFromLatestBlock[_requestId] < min(numberOfReporters, 5) && 
-            oldestTimestampFromLatestBlock[_requestId] > block.timestamp - timeLimit) {
-            _count--;
-        } 
-        
+        //get timestamp of most recent value submitted for the requestID
         uint256 _time =
             getTimestampbyRequestIDandIndex(_requestId, _count - 1);
+        //return the value if it is not disputed
         uint256 _value = retrieveData(_requestId, _time);
         if (_value > 0) return (true, _value, _time);
         return (false, 0, _time);
@@ -124,13 +122,17 @@ contract TellorMesosphere is AccessControl {
      * @return timestampRetrieved the value's timestamp
     */
     function getDataBefore(uint256 _requestId, uint256 _timestamp) external view returns (bool, uint256, uint256) {
+        //get index of submitted data of requestID at _timestamp
         (bool _found, uint256 _index) =
             _getIndexForDataBefore(_requestId, _timestamp);
+        //catch if invalid timestamp not found
         if (!_found) return (false, 0, 0);
+        //get timestamp of median value nearest to _timestamp
         uint256 _time =
             getTimestampbyRequestIDandIndex(_requestId, _index);
+        //retrieve the value
         uint256 _value = retrieveData(_requestId, _time);
-        //If value is diputed it'll return zero
+        //return value if not disputed
         if (_value > 0) return (true, _value, _time);
         return (false, 0, 0);
     }
@@ -161,6 +163,12 @@ contract TellorMesosphere is AccessControl {
      * @param _value the value for the requestId
     */
     function submitValue(uint256 _requestId, uint256 _value) external onlyReporter {
+
+        //there need to be more reporters than the quorum
+        require(
+            numberOfReporters >= quorum,
+            "not enough reporters"
+        );
         latestValues[_requestId][reporterIndices[msg.sender]] = _value;
         latestTimestamps[_requestId][reporterIndices[msg.sender]] = block.timestamp;
 
