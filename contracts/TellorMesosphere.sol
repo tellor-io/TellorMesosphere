@@ -34,7 +34,8 @@ contract TellorMesosphere is AccessControl {
     
     /*Events*/
     // Emits when a new median value is successfully generated
-    event NewMedian(uint256 _requestId, 
+    event NewMedian(
+        uint256 _requestId, 
         uint256 _time, 
         uint256 _value, 
         uint256 _index
@@ -229,7 +230,7 @@ contract TellorMesosphere is AccessControl {
             emit NewMedian(
                 _requestId, 
                 block.timestamp, 
-                _value, 
+                _median, 
                 _index
             );
         }
