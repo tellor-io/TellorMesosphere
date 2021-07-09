@@ -186,6 +186,7 @@ contract TellorMesosphere is AccessControl {
             }
             values[_requestId][block.timestamp] = _median;
             numberReportersFromLatestBlock[_requestId] = _numberOfValidReports;
+            emit NewMedian(_oldestTimestamp, _median, _requestId, _numberOfValidReports, _index)
         }
     }
     
