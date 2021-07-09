@@ -1,5 +1,6 @@
 node_modules 
 package-lock.json
+.env
 
 #Hardhat files
 cache
