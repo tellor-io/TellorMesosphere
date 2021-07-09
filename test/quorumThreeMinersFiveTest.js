@@ -206,9 +206,4 @@ describe("TellorMesosphere Quorum 3 Miners 5", function() {
     expect(currentValue[1]).to.equal(100);
   });
 
-
-
-
-
-
 });

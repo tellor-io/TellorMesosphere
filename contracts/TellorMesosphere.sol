@@ -3,8 +3,12 @@ pragma solidity 0.7.0;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./SafeMath.sol";
-import "hardhat/console.sol";
 
+/** 
+ @author Tellor Inc.
+ @title TellorMesosphere
+ @dev  Oracle for Tellor Fellowship
+**/
 contract TellorMesosphere is AccessControl {
 
     using SafeMath for uint256;
@@ -26,13 +30,23 @@ contract TellorMesosphere is AccessControl {
     uint256 public quorum;
     bytes32 public constant REPORTER_ROLE = keccak256("reporter");//used in access contract, the role of a given party
 
-    constructor(uint256 _quorum, uint256 _timeLimit, uint256 _maximumDeviation) {
-        quorum = _quorum;
-        timeLimit = _timeLimit;
-        maximumDeviation = _maximumDeviation;
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setRoleAdmin(REPORTER_ROLE, DEFAULT_ADMIN_ROLE);
-    }
+    
+    
+    /*Events*/
+    // Emits when a new median value is successfully generated
+    event NewMedian(uint256 _requestId, 
+        uint256 _time, 
+        uint256 _value, 
+        uint256 _index
+    );
+    
+    // Emits when a reporter submits a new value
+    event NewValueSubmitted(
+        uint256 _requestId, 
+        uint256 _time, 
+        uint256 _value,
+        address _reporter
+    );
 
     /**
      * @dev Modifier to restrict only to the admin role.
@@ -48,6 +62,22 @@ contract TellorMesosphere is AccessControl {
     modifier onlyReporter() {
         require(isReporter(msg.sender), "Restricted to reporters.");
         _;
+    }
+    
+    /*Functions*/
+    /**
+     * @dev Constructor to set original quorum, time limit, and maximum deviation
+     * @param _quorum Minimum number of valid reporters' submissions to create new median
+     * @param _timeLimit Time interval in which submissions are valid for creating new median
+     * @param _maximumDeviation Maximum distance from last median a range of submissions can be
+     * 
+    */
+    constructor(uint256 _quorum, uint256 _timeLimit, uint256 _maximumDeviation) {
+        quorum = _quorum;
+        timeLimit = _timeLimit;
+        maximumDeviation = _maximumDeviation;
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setRoleAdmin(REPORTER_ROLE, DEFAULT_ADMIN_ROLE);
     }
 
     /**
@@ -183,19 +213,32 @@ contract TellorMesosphere is AccessControl {
         (bool _ifRetrieve, uint256 _median, uint256 _oldestTimestamp, uint256 _numberOfValidReports) = _getNewMedian(_requestId);
 
         if(_ifRetrieve) {
+            uint256 _index;
             if(_oldestTimestamp == oldestTimestampFromLatestBlock[_requestId] && numberReportersFromLatestBlock[_requestId] < numberOfReporters) {
-                uint256 _index = timestamps[_requestId].length - 1;
+                _index = timestamps[_requestId].length - 1;
                 uint256 _previousTimestamp = timestamps[_requestId][_index];
                 values[_requestId][_previousTimestamp] = 0;
                 timestamps[_requestId][_index] = block.timestamp;
             } else {
+                _index = timestamps[_requestId].length;
                 timestamps[_requestId].push(block.timestamp);
                 oldestTimestampFromLatestBlock[_requestId] = _oldestTimestamp;
             }
             values[_requestId][block.timestamp] = _median;
             numberReportersFromLatestBlock[_requestId] = _numberOfValidReports;
-            emit NewMedian(_oldestTimestamp, _median, _requestId, _numberOfValidReports, _index)
+            emit NewMedian(
+                _requestId, 
+                block.timestamp, 
+                _value, 
+                _index
+            );
         }
+        emit NewValueSubmitted(
+            _requestId, 
+            block.timestamp, 
+            _value, 
+            msg.sender
+        );
     }
 
     /**
@@ -368,7 +411,12 @@ contract TellorMesosphere is AccessControl {
             return(true, _median, _oldestTimestamp, _numberOfValidReports);
         }
     }
-
+    
+    /**
+     * @dev Finds maximum of two values
+     * @param _a First value
+     * @param _b Second value
+    */
     function max(uint256 _a, uint256 _b) public pure returns(uint256) {
         if(_a > _b) {
             return(_a);
@@ -377,6 +425,11 @@ contract TellorMesosphere is AccessControl {
         }
     }
 
+    /**
+     * @dev Finds minimum of two values
+     * @param _a First value
+     * @param _b Second value
+    */
     function min(uint256 _a, uint256 _b) public pure returns(uint256) {
         if(_a < _b) {
             return(_a);
