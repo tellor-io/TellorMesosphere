@@ -111,8 +111,8 @@ contract TellorPlayground {
         bytes memory _queryData
     ) external {
         require(
-            _nonce == timestamps[_queryId].length,
-            "nonce should be correct"
+            _nonce == timestamps[_queryId].length || _nonce == 0,
+            "nonce must match timestamp index"
         );
         require(
             _queryId == keccak256(_queryData) || uint256(_queryId) <= 100,
