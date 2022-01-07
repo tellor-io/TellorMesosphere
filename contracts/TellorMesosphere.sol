@@ -98,7 +98,7 @@ contract TellorMesosphere is UsingTellor {
      * @param _b is the bytes variable to be sliced
      * @return _x of the sliced uint256
      */
-    function _sliceUint(bytes memory _b) public pure returns (uint256 _x) {
+    function _sliceUint(bytes memory _b) internal pure returns (uint256 _x) {
         uint256 _number = 0;
         for (uint256 _i = 0; _i < _b.length; _i++) {
             _number = _number * 2**8;
